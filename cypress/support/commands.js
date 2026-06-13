@@ -51,7 +51,7 @@ Cypress.Commands.add('login', (email, password) => {
         .clear()
         .type(user, { delay: 20 });
 
-      cy.contains(/continue/i, { timeout: 10000 }).click();
+      cy.get('button').contains(/continue/i, { timeout: 10000 }).click();
 
       // --- Step 2: Password + Sign in ---
       cy.get('input[type="password"], input[name="password"]', { timeout: 20000 })
@@ -59,11 +59,12 @@ Cypress.Commands.add('login', (email, password) => {
         .clear()
         .type(pass, { delay: 20 });
 
-      cy.contains(/sign in/i, { timeout: 10000 }).click();
+      cy.get('button').contains(/sign in/i, { timeout: 10000 }).click();
     }
   );
 
-  // Back on evo.dev.theysaid.io after successful auth redirect
+  // Wait for AuthKit redirect back to evo.dev.theysaid.io to complete
+  cy.url({ timeout: 30000 }).should('not.include', 'authkit.app');
   cy.url({ timeout: 30000 }).should('include', '/projects');
   cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
 });

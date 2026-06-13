@@ -15,7 +15,6 @@ describe('EVO - Login Flow', () => {
     cy.visit('/');
 
     cy.origin(AUTHKIT_ORIGIN, () => {
-      // --- Step 1: Email + Continue ---
       cy.contains('Sign in', { timeout: 20000 }).should('be.visible');
 
       cy.get('input[type="email"], input[name="email"]', { timeout: 20000 })
@@ -23,15 +22,14 @@ describe('EVO - Login Flow', () => {
         .clear()
         .type('raihan.mahmud514@gmail.com');
 
-      cy.contains(/continue/i, { timeout: 10000 }).click();
+      cy.get('button').contains(/continue/i, { timeout: 10000 }).click();
 
-      // --- Step 2: Password + Sign in ---
       cy.get('input[type="password"], input[name="password"]', { timeout: 20000 })
         .should('be.visible')
         .clear()
         .type('WrongPassword123!');
 
-      cy.contains(/sign in/i, { timeout: 10000 }).click();
+      cy.get('button').contains(/sign in/i, { timeout: 10000 }).click();
 
       cy.contains(/invalid email or password/i, { timeout: 20000 }).should('be.visible');
 
