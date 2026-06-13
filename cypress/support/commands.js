@@ -55,6 +55,17 @@ Cypress.Commands.add('openCreateProjectModal', () => {
   cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
   cy.contains('button', 'Add project', { timeout: 15000 }).click();
   cy.contains('Create', { timeout: 15000 }).should('be.visible');
+
+  // The option list renders inside a carousel/slider whose container can
+  // briefly have width:0 while it measures/animates in. Wait until it has
+  // a real width before proceeding.
+  cy.get('.relative.flex.h-full.flex-col.overflow-hidden', { timeout: 15000 })
+    .should(($el) => {
+      expect($el.outerWidth()).to.be.greaterThan(0);
+    });
+
+  // Small settle delay for the carousel's internal layout/animation
+  cy.wait(500);
 });
 
 /**
@@ -66,6 +77,8 @@ Cypress.Commands.add('createProject', (typeName) => {
   cy.openCreateProjectModal();
 
   cy.contains(typeName, { timeout: 15000 })
+    .should('exist')
+    .scrollIntoView()
     .should('be.visible')
     .closest('[role="button"], button, li, div')
     .click({ force: true });
