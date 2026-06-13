@@ -5,15 +5,22 @@
 /**
  * IMPORTANT - AuthKit cross-origin login:
  * evo.dev.theysaid.io redirects unauthenticated users to a WorkOS AuthKit
- * domain (e.g. https://mystical-turtle-68-staging.authkit.app/...) to log in.
+ * domain (https://mystical-turtle-68-staging.authkit.app/...) to log in.
  * Cypress treats this as a different origin, so all interactions on that
- * page MUST happen inside cy.origin(). After successful login, AuthKit
- * redirects back to evo.dev.theysaid.io.
+ * page MUST happen inside cy.origin() with the EXACT origin (including
+ * subdomain). After successful login, AuthKit redirects back to
+ * evo.dev.theysaid.io.
  *
  * Selectors below are best-effort guesses for a standard AuthKit hosted
  * login form. Adjust the AUTHKIT_SELECTORS map after one `cypress open`
  * run with the real page inspected via devtools.
+ *
+ * NOTE: If this AuthKit subdomain ('mystical-turtle-68-staging') ever
+ * changes/rotates, update the hardcoded origin string below in both
+ * places it's used.
  */
+
+const AUTHKIT_ORIGIN = 'https://mystical-turtle-68-staging.authkit.app';
 
 const AUTHKIT_SELECTORS = {
   emailInput: 'input[name="email"], input[type="email"], #email',
@@ -40,9 +47,9 @@ Cypress.Commands.add('login', (email, password) => {
   // Visit the app - it will redirect to the AuthKit domain
   cy.visit('/');
 
-  // Wait for redirect to AuthKit hosted login page
+  // Interact with the AuthKit hosted login page (exact origin required)
   cy.origin(
-    'authkit.app',
+    AUTHKIT_ORIGIN,
     { args: { user, pass, SEL: AUTHKIT_SELECTORS } },
     ({ user, pass, SEL }) => {
       // --- Email step ---
@@ -191,4 +198,4 @@ Cypress.Commands.add('takePublishedSurvey', (surveyUrl) => {
   cy.contains('the survey is complete', { timeout: 30000 }).should('be.visible');
 });
 
-module.exports = { AUTHKIT_SELECTORS, APP_SELECTORS };
+module.exports = { AUTHKIT_SELECTORS, APP_SELECTORS, AUTHKIT_ORIGIN };

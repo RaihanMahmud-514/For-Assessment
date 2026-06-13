@@ -13,8 +13,6 @@ module.exports = defineConfig({
     videosFolder: "cypress/videos",
     screenshotsFolder: "cypress/screenshots",
     screenshotOnRunFailure: true,
-    // Required for cy.origin() to work across evo.dev.theysaid.io <-> authkit.app
-    experimentalSessionAndOrigin: true,
     retries: {
       runMode: 1,
       openMode: 0

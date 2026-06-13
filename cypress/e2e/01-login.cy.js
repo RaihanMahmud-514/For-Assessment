@@ -1,5 +1,7 @@
 /// <reference types="cypress" />
 
+const AUTHKIT_ORIGIN = 'https://mystical-turtle-68-staging.authkit.app';
+
 describe('EVO - Login Flow', () => {
   it('logs in with valid credentials and lands on AI Projects page', () => {
     cy.login();
@@ -12,7 +14,7 @@ describe('EVO - Login Flow', () => {
   it('shows an error for invalid credentials', () => {
     cy.visit('/');
 
-    cy.origin('authkit.app', () => {
+    cy.origin(AUTHKIT_ORIGIN, () => {
       cy.get('input[type="email"], input[name="email"]', { timeout: 20000 })
         .should('be.visible')
         .type('invalid-user@example.com');
