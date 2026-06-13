@@ -13,6 +13,8 @@ module.exports = defineConfig({
     videosFolder: "cypress/videos",
     screenshotsFolder: "cypress/screenshots",
     screenshotOnRunFailure: true,
+    // Required for cy.origin() to work across evo.dev.theysaid.io <-> authkit.app
+    experimentalSessionAndOrigin: true,
     retries: {
       runMode: 1,
       openMode: 0
@@ -25,7 +27,6 @@ module.exports = defineConfig({
       json: true
     },
     setupNodeEvents(on, config) {
-      // Allows reading env vars / fixtures dynamically
       return config;
     },
     specPattern: "cypress/e2e/**/*.cy.js",

@@ -3,34 +3,29 @@
 // ***********************************************
 
 /**
- * Logs in via the UI using credentials from Cypress env (EVO_EMAIL / EVO_PASSWORD).
- * NOTE: The registration/OTP flow is intentionally NOT covered here.
- * This assumes a pre-existing verified test account.
+ * IMPORTANT - AuthKit cross-origin login:
+ * evo.dev.theysaid.io redirects unauthenticated users to a WorkOS AuthKit
+ * domain (e.g. https://mystical-turtle-68-staging.authkit.app/...) to log in.
+ * Cypress treats this as a different origin, so all interactions on that
+ * page MUST happen inside cy.origin(). After successful login, AuthKit
+ * redirects back to evo.dev.theysaid.io.
  *
- * The login form is served from a separate AuthKit origin
- * (mystical-turtle-68-staging.authkit.app) after redirect from /login,
- * so those interactions are wrapped in cy.origin().
- *
- * Selectors are written defensively (data-cy first, falling back to
- * placeholder/text matching) since the live DOM was not fully inspected.
- * Adjust once you run `cypress open` against the real app and confirm
- * actual attributes via devtools / codegen.
+ * Selectors below are best-effort guesses for a standard AuthKit hosted
+ * login form. Adjust the AUTHKIT_SELECTORS map after one `cypress open`
+ * run with the real page inspected via devtools.
  */
 
-const SELECTORS = {
-  emailInput: '[data-cy="login-email"], input[name="email"], input[type="email"]',
-  passwordInput: '[data-cy="login-password"], input[name="password"], input[type="password"]',
-  loginSubmit: '[data-cy="login-submit"], button[type="submit"]',
-  userMenu: '[data-cy="user-menu"], img[alt*="profile" i], .avatar',
-  addProjectBtn: 'button:contains("Add project")',
-  aiSurveyOption: ':contains("AI Survey")',
-  createSurveyBtn: 'button:contains("Create AI Survey")',
-  draftSkipBtn: 'button:contains("Skip")',
-  publishBtn: 'button:contains("Publish")',
-  publishedModalLink: 'input[value*="survey/project"], a[href*="/survey/project"]'
+const AUTHKIT_SELECTORS = {
+  emailInput: 'input[name="email"], input[type="email"], #email',
+  passwordInput: 'input[name="password"], input[type="password"], #password',
+  submitButton: 'button[type="submit"], button:contains("Sign in"), button:contains("Continue"), button:contains("Log in")',
+  continueButton: 'button:contains("Continue")', // some AuthKit flows split email/password into two steps
+  errorMessage: '[role="alert"], .error, [data-error], :contains("Invalid"), :contains("incorrect")'
 };
 
-const AUTH_ORIGIN = 'https://mystical-turtle-68-staging.authkit.app';
+const APP_SELECTORS = {
+  addProjectBtn: 'button:contains("Add project")',
+};
 
 Cypress.Commands.add('login', (email, password) => {
   const user = email || Cypress.env('EVO_EMAIL');
@@ -42,29 +37,40 @@ Cypress.Commands.add('login', (email, password) => {
     );
   }
 
-  cy.visit('/login');
+  // Visit the app - it will redirect to the AuthKit domain
+  cy.visit('/');
 
-  // Login form is hosted on the AuthKit origin after redirect
-  cy.origin(AUTH_ORIGIN, { args: { user, pass } }, ({ user, pass }) => {
-    const emailInput = '[data-cy="login-email"], input[name="email"], input[type="email"]';
-    const passwordInput = '[data-cy="login-password"], input[name="password"], input[type="password"]';
-    const loginSubmit = '[data-cy="login-submit"], button[type="submit"]';
+  // Wait for redirect to AuthKit hosted login page
+  cy.origin(
+    'authkit.app',
+    { args: { user, pass, SEL: AUTHKIT_SELECTORS } },
+    ({ user, pass, SEL }) => {
+      // --- Email step ---
+      cy.get(SEL.emailInput, { timeout: 20000 }).should('be.visible').clear().type(user, { delay: 20 });
 
-    cy.get(emailInput, { timeout: 15000 })
-      .should('be.visible')
-      .clear()
-      .type(user, { delay: 20 });
+      // Some AuthKit flows have a "Continue" button between email and password steps
+      cy.get('body').then(($body) => {
+        if ($body.find(SEL.passwordInput).length === 0 && $body.find(SEL.continueButton).length > 0) {
+          cy.contains('button', /continue/i).click();
+        }
+      });
 
-    cy.get(passwordInput)
-      .should('be.visible')
-      .clear()
-      .type(pass, { delay: 20 });
+      // --- Password step ---
+      cy.get(SEL.passwordInput, { timeout: 20000 }).should('be.visible').clear().type(pass, { delay: 20 });
 
-    cy.get(loginSubmit).click();
-  });
+      // --- Submit ---
+      cy.get('body').then(($body) => {
+        if ($body.find('button[type="submit"]').length > 0) {
+          cy.get('button[type="submit"]').click();
+        } else {
+          cy.contains('button', /sign in|log in|continue/i).click();
+        }
+      });
+    }
+  );
 
-  // Confirm we landed back in an authenticated area on the main app
-  cy.url({ timeout: 20000 }).should('include', '/projects');
+  // Back on evo.dev.theysaid.io after successful auth redirect
+  cy.url({ timeout: 30000 }).should('include', '/projects');
   cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
 });
 
@@ -80,7 +86,7 @@ Cypress.Commands.add('openCreateProjectModal', () => {
 
 /**
  * Creates a new AI Survey project, skips the AI draft-goal modal,
- * and returns to the questions builder. Returns the project URL alias.
+ * and returns to the questions builder.
  */
 Cypress.Commands.add('createAiSurveyProject', () => {
   cy.openCreateProjectModal();
@@ -91,7 +97,6 @@ Cypress.Commands.add('createAiSurveyProject', () => {
 
   cy.url({ timeout: 20000 }).should('include', 'project-type=Form');
 
-  // The "Draft project" goal modal appears - skip it for test stability
   cy.get('body').then(($body) => {
     if ($body.find('button:contains("Skip")').length > 0) {
       cy.contains('button', 'Skip').click();
@@ -120,7 +125,6 @@ Cypress.Commands.add('uploadTeachAiDocument', (fixtureFileName) => {
     .should('be.enabled')
     .click();
 
-  // Verify the new file appears in the data sources list
   cy.get('[data-cy="data-sources-list"], body')
     .contains(fixtureFileName, { timeout: 30000 })
     .should('be.visible');
@@ -134,7 +138,6 @@ Cypress.Commands.add('publishCurrentProject', () => {
 
   cy.contains('Your project has been published', { timeout: 30000 }).should('be.visible');
 
-  // Extract the public link from the input/readonly field shown in the modal
   return cy
     .get('input', { timeout: 15000 })
     .filter((i, el) => /survey\/project/.test(el.value || ''))
@@ -147,9 +150,7 @@ Cypress.Commands.add('publishCurrentProject', () => {
 });
 
 /**
- * Drives the public survey end-to-end by answering open-ended,
- * rating, multiple-choice and ranking question types generically,
- * then confirms the completion message.
+ * Drives the public survey end-to-end generically until completion.
  */
 Cypress.Commands.add('takePublishedSurvey', (surveyUrl) => {
   cy.visit(surveyUrl);
@@ -157,7 +158,6 @@ Cypress.Commands.add('takePublishedSurvey', (surveyUrl) => {
   cy.get('[placeholder*="response" i], textarea, input[type="text"]', { timeout: 30000 })
     .should('be.visible');
 
-  // Loop answering questions generically until completion message appears
   const MAX_STEPS = 15;
 
   const answerStep = (step) => {
@@ -165,14 +165,12 @@ Cypress.Commands.add('takePublishedSurvey', (surveyUrl) => {
 
     cy.get('body').then(($body) => {
       if ($body.text().includes('the survey is complete')) {
-        return; // done
+        return;
       }
 
-      // Rating buttons (numbered 1-5)
       if ($body.find('button:contains("5")').length && $body.find('button:contains("1")').length) {
         cy.contains('button', '4').click({ force: true });
       } else {
-        // Free-text / chat input fallback
         cy.get('[placeholder*="response" i], textarea, input[type="text"]')
           .first()
           .clear({ force: true })
@@ -193,4 +191,4 @@ Cypress.Commands.add('takePublishedSurvey', (surveyUrl) => {
   cy.contains('the survey is complete', { timeout: 30000 }).should('be.visible');
 });
 
-module.exports = SELECTORS;
+module.exports = { AUTHKIT_SELECTORS, APP_SELECTORS };
