@@ -85,9 +85,6 @@ Cypress.Commands.add('openCreateProjectModal', () => {
   // Give the Radix dialog open animation / scroll-lock time to settle.
   // (Avoid asserting on body CSS directly - too brittle in headless CI.)
   cy.wait(1000);
-
-  // Confirm the list item we'll click next is visible
-  cy.contains('AI Survey', { timeout: 15000 }).should('be.visible');
 });
 
 /**
@@ -117,6 +114,95 @@ Cypress.Commands.add('createAiSurveyProject', () => {
   });
 
   cy.contains('Questions', { timeout: 20000 }).should('be.visible');
+});
+
+/**
+ * Creates a new AI User Test project end-to-end:
+ * Create modal -> AI User Test -> Draft project (with goal) ->
+ * wait for AI generation -> Publish -> copy link -> close modal ->
+ * back to AI Projects list.
+ * Stores the published survey URL via the 'publishedSurveyUrl' alias.
+ */
+Cypress.Commands.add('createAiUserTestProject', (learningGoal) => {
+  const goal =
+    learningGoal ||
+    'Understand how users search for and navigate to creative tools on the website.';
+
+  cy.openCreateProjectModal();
+
+  // Select "AI User Test" card
+  cy.contains('AI User Test', { timeout: 15000 })
+    .should('be.visible')
+    .click({ force: true });
+
+  // Click "Create AI User Test"
+  cy.contains('button', /Create AI User Test/i, { timeout: 15000 })
+    .should('be.visible')
+    .click({ force: true });
+
+  // "Draft project" modal appears - enter the learning goal/purpose
+  cy.contains('Draft project', { timeout: 20000 }).should('be.visible');
+
+  cy.get(
+    'textarea[placeholder*="learning goal" i], textarea[placeholder*="purpose" i], textarea',
+    { timeout: 15000 }
+  )
+    .first()
+    .should('be.visible')
+    .clear()
+    .type(goal, { delay: 10 });
+
+  // Click the "Draft project" action button (bottom right of the modal)
+  cy.contains('button', /^Draft project$/i, { timeout: 15000 })
+    .should('be.visible')
+    .click({ force: true });
+
+  // Wait for AI generation steps to complete
+  cy.contains('Generating Survey Questions', { timeout: 30000 }).should('be.visible');
+  cy.contains('Quality Assurance & Optimization', { timeout: 60000 }).should('exist');
+
+  // Wait for the "Draft project" progress modal to close and the builder to load
+  cy.contains('Draft project', { timeout: 60000 }).should('not.exist');
+  cy.contains('Build', { timeout: 30000 }).should('be.visible');
+  cy.contains('Questions', { timeout: 20000 }).should('be.visible');
+
+  // Publish the project
+  cy.contains('button', 'Publish', { timeout: 15000 })
+    .should('be.visible')
+    .click({ force: true });
+
+  // Confirm publish success
+  cy.contains('Your project has been published', { timeout: 30000 }).should('be.visible');
+
+  // Capture the published survey link
+  cy.get('input', { timeout: 15000 })
+    .filter((i, el) => /survey\/project/.test(el.value || ''))
+    .first()
+    .invoke('val')
+    .then((url) => {
+      cy.wrap(url).as('publishedSurveyUrl');
+    });
+
+  // Click "Copy link"
+  cy.contains('button', /copy link/i, { timeout: 10000 })
+    .should('be.visible')
+    .click({ force: true });
+
+  // Close the "Your project has been published!" modal via its X icon
+  cy.contains('h2, h3, [role="heading"]', /your project has been published/i, { timeout: 10000 })
+    .parents('[role="dialog"], .fixed, div')
+    .first()
+    .within(() => {
+      cy.get('button').first().click({ force: true });
+    });
+
+  // Navigate back to AI Projects via the left sidebar
+  cy.contains('AI Projects', { timeout: 15000 })
+    .should('be.visible')
+    .click({ force: true });
+
+  cy.url({ timeout: 20000 }).should('include', '/projects');
+  cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
 });
 
 /**

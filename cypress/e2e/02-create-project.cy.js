@@ -43,4 +43,15 @@ describe('EVO - Create Project Flow', () => {
       }
     });
   });
+
+  it('creates, drafts, and publishes a new AI User Test project end-to-end', () => {
+    cy.createAiUserTestProject(
+      'Understand how users search for and navigate to creative tools on the website.'
+    );
+
+    cy.get('@publishedSurveyUrl').should('match', /survey\/project\/[0-9a-f-]{36}/i);
+
+    cy.url().should('include', '/projects');
+    cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
+  });
 });
