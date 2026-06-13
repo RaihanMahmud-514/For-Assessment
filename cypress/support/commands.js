@@ -51,7 +51,7 @@ Cypress.Commands.add('login', (email, password) => {
         .clear()
         .type(user, { delay: 20 });
 
-      cy.contains('button', /^continue$/i, { timeout: 10000 }).click();
+      cy.contains(/continue/i, { timeout: 10000 }).click();
 
       // --- Step 2: Password + Sign in ---
       cy.get('input[type="password"], input[name="password"]', { timeout: 20000 })
@@ -59,7 +59,7 @@ Cypress.Commands.add('login', (email, password) => {
         .clear()
         .type(pass, { delay: 20 });
 
-      cy.contains('button', /^sign in$/i, { timeout: 10000 }).click();
+      cy.contains(/^sign in$/i, { timeout: 10000 }).click();
     }
   );
 
