@@ -11,24 +11,15 @@
  * subdomain). After successful login, AuthKit redirects back to
  * evo.dev.theysaid.io.
  *
- * Selectors below are best-effort guesses for a standard AuthKit hosted
- * login form. Adjust the AUTHKIT_SELECTORS map after one `cypress open`
- * run with the real page inspected via devtools.
+ * Confirmed real flow (two steps):
+ *   Step 1: Email field + "Continue" button (also shows OAuth options)
+ *   Step 2: Password field + "Sign in" button
  *
  * NOTE: If this AuthKit subdomain ('mystical-turtle-68-staging') ever
- * changes/rotates, update the hardcoded origin string below in both
- * places it's used.
+ * changes/rotates, update AUTHKIT_ORIGIN below.
  */
 
 const AUTHKIT_ORIGIN = 'https://mystical-turtle-68-staging.authkit.app';
-
-const AUTHKIT_SELECTORS = {
-  emailInput: 'input[name="email"], input[type="email"], #email',
-  passwordInput: 'input[name="password"], input[type="password"], #password',
-  submitButton: 'button[type="submit"], button:contains("Sign in"), button:contains("Continue"), button:contains("Log in")',
-  continueButton: 'button:contains("Continue")', // some AuthKit flows split email/password into two steps
-  errorMessage: '[role="alert"], .error, [data-error], :contains("Invalid"), :contains("incorrect")'
-};
 
 const APP_SELECTORS = {
   addProjectBtn: 'button:contains("Add project")',
@@ -50,29 +41,25 @@ Cypress.Commands.add('login', (email, password) => {
   // Interact with the AuthKit hosted login page (exact origin required)
   cy.origin(
     AUTHKIT_ORIGIN,
-    { args: { user, pass, SEL: AUTHKIT_SELECTORS } },
-    ({ user, pass, SEL }) => {
-      // --- Email step ---
-      cy.get(SEL.emailInput, { timeout: 20000 }).should('be.visible').clear().type(user, { delay: 20 });
+    { args: { user, pass } },
+    ({ user, pass }) => {
+      // --- Step 1: Email + Continue ---
+      cy.contains('Sign in', { timeout: 20000 }).should('be.visible');
 
-      // Some AuthKit flows have a "Continue" button between email and password steps
-      cy.get('body').then(($body) => {
-        if ($body.find(SEL.passwordInput).length === 0 && $body.find(SEL.continueButton).length > 0) {
-          cy.contains('button', /continue/i).click();
-        }
-      });
+      cy.get('input[type="email"], input[name="email"]', { timeout: 20000 })
+        .should('be.visible')
+        .clear()
+        .type(user, { delay: 20 });
 
-      // --- Password step ---
-      cy.get(SEL.passwordInput, { timeout: 20000 }).should('be.visible').clear().type(pass, { delay: 20 });
+      cy.contains('button', /^continue$/i, { timeout: 10000 }).click();
 
-      // --- Submit ---
-      cy.get('body').then(($body) => {
-        if ($body.find('button[type="submit"]').length > 0) {
-          cy.get('button[type="submit"]').click();
-        } else {
-          cy.contains('button', /sign in|log in|continue/i).click();
-        }
-      });
+      // --- Step 2: Password + Sign in ---
+      cy.get('input[type="password"], input[name="password"]', { timeout: 20000 })
+        .should('be.visible')
+        .clear()
+        .type(pass, { delay: 20 });
+
+      cy.contains('button', /^sign in$/i, { timeout: 10000 }).click();
     }
   );
 
@@ -198,4 +185,4 @@ Cypress.Commands.add('takePublishedSurvey', (surveyUrl) => {
   cy.contains('the survey is complete', { timeout: 30000 }).should('be.visible');
 });
 
-module.exports = { AUTHKIT_SELECTORS, APP_SELECTORS, AUTHKIT_ORIGIN };
+module.exports = { APP_SELECTORS, AUTHKIT_ORIGIN };
