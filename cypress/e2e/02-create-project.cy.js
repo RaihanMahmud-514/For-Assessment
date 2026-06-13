@@ -1,6 +1,18 @@
 /// <reference types="cypress" />
 
-const NOT_IN_CHAT_SIDEBAR = ':not([data-test="chat-sidebar"] *)';
+function assertVisibleByText(text) {
+  cy.get('body', { timeout: 15000 }).should(() => {
+    const matches = Cypress.$(`*:contains("${text}")`).filter((i, el) => {
+      const $el = Cypress.$(el);
+      const hasMatchingChild = $el.children().toArray().some(
+        (child) => Cypress.$(child).text().includes(text)
+      );
+      if (hasMatchingChild) return false;
+      return $el.is(':visible') && $el.width() > 0 && $el.height() > 0;
+    });
+    expect(matches.length, `visible element containing "${text}"`).to.be.greaterThan(0);
+  });
+}
 
 describe('EVO - Create Project Flow', () => {
   beforeEach(() => {
@@ -10,21 +22,10 @@ describe('EVO - Create Project Flow', () => {
   it('opens the Create modal and lists all project type options', () => {
     cy.openCreateProjectModal();
 
-    cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
-      .contains(/AI User Test/i)
-      .should('be.visible');
-
-    cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
-      .contains(/AI Interview/i)
-      .should('be.visible');
-
-    cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
-      .contains(/AI Survey/i)
-      .should('be.visible');
-
-    cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
-      .contains(/AI Poll/i)
-      .should('be.visible');
+    assertVisibleByText('AI User Test');
+    assertVisibleByText('AI Interview');
+    assertVisibleByText('AI Survey');
+    assertVisibleByText('AI Poll');
   });
 
   it('creates a new AI Survey project and opens the question builder', () => {

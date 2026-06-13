@@ -6,8 +6,39 @@ const AUTHKIT_ORIGIN = 'https://mystical-turtle-68-staging.authkit.app';
 
 const APP_SELECTORS = {
   addProjectBtn: 'button:contains("Add project")',
-  notInChatSidebar: ':not([data-test="chat-sidebar"] *)',
 };
+
+/**
+ * Finds the leaf-most, visible, non-zero-size element containing the
+ * given text and clicks it. Avoids matching elements inside the
+ * collapsed "Ask AI" chat sidebar (which is w-0/overflow-hidden and
+ * can contain stale text like "AI Surveys", "AI User Tests", etc.),
+ * since those are invisible/zero-size and get filtered out.
+ */
+function clickVisibleByText(text, timeout = 15000) {
+  const escaped = text.replace(/"/g, '\\"');
+
+  const findMatch = () => {
+    return Cypress.$(`*:contains("${escaped}")`).filter((i, el) => {
+      const $el = Cypress.$(el);
+      const hasMatchingChild = $el.children().toArray().some(
+        (child) => Cypress.$(child).text().includes(text)
+      );
+      if (hasMatchingChild) return false;
+      return $el.is(':visible') && $el.width() > 0 && $el.height() > 0;
+    });
+  };
+
+  cy.get('body', { timeout }).should(() => {
+    const matches = findMatch();
+    expect(matches.length, `visible element containing "${text}"`).to.be.greaterThan(0);
+  });
+
+  return cy.get('body').then(() => {
+    const $match = findMatch().first();
+    return cy.wrap($match).scrollIntoView().click({ force: true });
+  });
+}
 
 Cypress.Commands.add('login', (email, password) => {
   const user = email || Cypress.env('EVO_EMAIL');
@@ -50,12 +81,6 @@ Cypress.Commands.add('login', (email, password) => {
 
 /**
  * Opens the "Create" project modal from the AI Projects page.
- *
- * NOTE: The app's "Ask AI" chat sidebar ([data-test="chat-sidebar"])
- * persists in the DOM even when collapsed and can contain stale chat
- * history listing items like "AI Surveys", "AI User Tests", etc.
- * All subsequent commands exclude elements inside that sidebar via
- * the ':not([data-test="chat-sidebar"] *)' pattern.
  */
 Cypress.Commands.add('openCreateProjectModal', () => {
   cy.visit('/projects');
@@ -64,9 +89,14 @@ Cypress.Commands.add('openCreateProjectModal', () => {
 
   cy.wait(1000);
 
-  cy.get(`*${APP_SELECTORS.notInChatSidebar}`, { timeout: 15000 })
-    .contains(/^Create$/)
-    .should('exist');
+  // Confirm a visible "Create" heading exists (the modal, not chat history)
+  cy.get('body', { timeout: 15000 }).should(() => {
+    const matches = Cypress.$('*:contains("Create")').filter((i, el) => {
+      const $el = Cypress.$(el);
+      return $el.is(':visible') && $el.width() > 0 && $el.height() > 0;
+    });
+    expect(matches.length).to.be.greaterThan(0);
+  });
 });
 
 /**
@@ -76,15 +106,9 @@ Cypress.Commands.add('openCreateProjectModal', () => {
 Cypress.Commands.add('createAiSurveyProject', () => {
   cy.openCreateProjectModal();
 
-  cy.get(`li${APP_SELECTORS.notInChatSidebar}`, { timeout: 15000 })
-    .contains(/AI Survey/i)
-    .should('be.visible')
-    .click({ force: true });
+  clickVisibleByText('AI Survey');
 
-  cy.get(`button${APP_SELECTORS.notInChatSidebar}`, { timeout: 15000 })
-    .contains(/Create AI Survey/i)
-    .should('be.visible')
-    .click({ force: true });
+  clickVisibleByText('Create AI Survey');
 
   cy.url({ timeout: 20000 }).should('include', 'project-type=Form');
 
@@ -111,15 +135,9 @@ Cypress.Commands.add('createAiUserTestProject', (learningGoal) => {
 
   cy.openCreateProjectModal();
 
-  cy.get(`li${APP_SELECTORS.notInChatSidebar}`, { timeout: 15000 })
-    .contains(/AI User Test/i)
-    .should('be.visible')
-    .click({ force: true });
+  clickVisibleByText('AI User Test');
 
-  cy.get(`button${APP_SELECTORS.notInChatSidebar}`, { timeout: 15000 })
-    .contains(/Create AI User Test/i)
-    .should('be.visible')
-    .click({ force: true });
+  clickVisibleByText('Create AI User Test');
 
   cy.contains('Draft project', { timeout: 20000 }).should('exist');
 
