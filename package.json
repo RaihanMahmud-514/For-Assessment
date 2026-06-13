@@ -1,0 +1,20 @@
+{
+  "name": "evo-cypress-e2e",
+  "version": "1.0.0",
+  "description": "Cypress e2e automation suite for evo.dev.theysaid.io with Mochawesome HTML reporting",
+  "scripts": {
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "test": "rimraf cypress/reports || true; cypress run --reporter mochawesome --reporter-options reportDir=cypress/reports/mocha,overwrite=false,html=false,json=true",
+    "test:report": "npm run test; npm run merge:report; npm run generate:report",
+    "merge:report": "mochawesome-merge cypress/reports/mocha/*.json > cypress/reports/mochawesome.json",
+    "generate:report": "marge cypress/reports/mochawesome.json --reportDir cypress/reports --inline -t \"EVO E2E Test Report\" -p \"evo-e2e-report\""
+  },
+  "devDependencies": {
+    "cypress": "^13.13.0",
+    "mochawesome": "^7.1.3",
+    "mochawesome-merge": "^4.3.0",
+    "mochawesome-report-generator": "^6.2.0",
+    "rimraf": "^5.0.5"
+  }
+}

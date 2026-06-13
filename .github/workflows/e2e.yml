@@ -1,0 +1,79 @@
+name: EVO E2E Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        spec:
+          - cypress/e2e/01-login.cy.js
+          - cypress/e2e/02-create-project.cy.js
+          - cypress/e2e/03-teach-ai-upload.cy.js
+          - cypress/e2e/04-publish-and-survey.cy.js
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run Cypress spec
+        uses: cypress-io/github-action@v6
+        with:
+          spec: ${{ matrix.spec }}
+        env:
+          EVO_EMAIL: ${{ secrets.EVO_EMAIL }}
+          EVO_PASSWORD: ${{ secrets.EVO_PASSWORD }}
+
+      - name: Upload Mochawesome JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mocha-results-${{ strategy.job-index }}
+          path: cypress/reports/mocha/*.json
+
+      - name: Upload screenshots/videos on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-artifacts-${{ strategy.job-index }}
+          path: |
+            cypress/screenshots
+            cypress/videos
+
+  merge-report:
+    needs: e2e
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: cypress/reports/mocha
+          pattern: mocha-results-*
+          merge-multiple: true
+
+      - run: npm run merge:report
+      - run: npm run generate:report
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evo-e2e-html-report
+          path: cypress/reports/evo-e2e-report.html
