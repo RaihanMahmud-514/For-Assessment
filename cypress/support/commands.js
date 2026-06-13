@@ -7,10 +7,14 @@
  * NOTE: The registration/OTP flow is intentionally NOT covered here.
  * This assumes a pre-existing verified test account.
  *
+ * The login form is served from a separate AuthKit origin
+ * (mystical-turtle-68-staging.authkit.app) after redirect from /login,
+ * so those interactions are wrapped in cy.origin().
+ *
  * Selectors are written defensively (data-cy first, falling back to
  * placeholder/text matching) since the live DOM was not fully inspected.
- * Adjust the SELECTORS map below once you run `cypress open` against the
- * real app and confirm actual attributes via devtools / codegen.
+ * Adjust once you run `cypress open` against the real app and confirm
+ * actual attributes via devtools / codegen.
  */
 
 const SELECTORS = {
@@ -26,6 +30,8 @@ const SELECTORS = {
   publishedModalLink: 'input[value*="survey/project"], a[href*="/survey/project"]'
 };
 
+const AUTH_ORIGIN = 'https://mystical-turtle-68-staging.authkit.app';
+
 Cypress.Commands.add('login', (email, password) => {
   const user = email || Cypress.env('EVO_EMAIL');
   const pass = password || Cypress.env('EVO_PASSWORD');
@@ -38,19 +44,26 @@ Cypress.Commands.add('login', (email, password) => {
 
   cy.visit('/login');
 
-  cy.get(SELECTORS.emailInput, { timeout: 15000 })
-    .should('be.visible')
-    .clear()
-    .type(user, { delay: 20 });
+  // Login form is hosted on the AuthKit origin after redirect
+  cy.origin(AUTH_ORIGIN, { args: { user, pass } }, ({ user, pass }) => {
+    const emailInput = '[data-cy="login-email"], input[name="email"], input[type="email"]';
+    const passwordInput = '[data-cy="login-password"], input[name="password"], input[type="password"]';
+    const loginSubmit = '[data-cy="login-submit"], button[type="submit"]';
 
-  cy.get(SELECTORS.passwordInput)
-    .should('be.visible')
-    .clear()
-    .type(pass, { delay: 20 });
+    cy.get(emailInput, { timeout: 15000 })
+      .should('be.visible')
+      .clear()
+      .type(user, { delay: 20 });
 
-  cy.get(SELECTORS.loginSubmit).click();
+    cy.get(passwordInput)
+      .should('be.visible')
+      .clear()
+      .type(pass, { delay: 20 });
 
-  // Confirm we landed in an authenticated area
+    cy.get(loginSubmit).click();
+  });
+
+  // Confirm we landed back in an authenticated area on the main app
   cy.url({ timeout: 20000 }).should('include', '/projects');
   cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
 });
