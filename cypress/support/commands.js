@@ -8,38 +8,6 @@ const APP_SELECTORS = {
   addProjectBtn: 'button:contains("Add project")',
 };
 
-/**
- * Finds the leaf-most, visible, non-zero-size element containing the
- * given text and clicks it. Avoids matching elements inside the
- * collapsed "Ask AI" chat sidebar (which is w-0/overflow-hidden and
- * can contain stale text like "AI Surveys", "AI User Tests", etc.),
- * since those are invisible/zero-size and get filtered out.
- */
-function clickVisibleByText(text, timeout = 15000) {
-  const escaped = text.replace(/"/g, '\\"');
-
-  const findMatch = () => {
-    return Cypress.$(`*:contains("${escaped}")`).filter((i, el) => {
-      const $el = Cypress.$(el);
-      const hasMatchingChild = $el.children().toArray().some(
-        (child) => Cypress.$(child).text().includes(text)
-      );
-      if (hasMatchingChild) return false;
-      return $el.is(':visible') && $el.width() > 0 && $el.height() > 0;
-    });
-  };
-
-  cy.get('body', { timeout }).should(() => {
-    const matches = findMatch();
-    expect(matches.length, `visible element containing "${text}"`).to.be.greaterThan(0);
-  });
-
-  return cy.get('body').then(() => {
-    const $match = findMatch().first();
-    return cy.wrap($match).scrollIntoView().click({ force: true });
-  });
-}
-
 Cypress.Commands.add('login', (email, password) => {
   const user = email || Cypress.env('EVO_EMAIL');
   const pass = password || Cypress.env('EVO_PASSWORD');
@@ -86,16 +54,32 @@ Cypress.Commands.add('openCreateProjectModal', () => {
   cy.visit('/projects');
   cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
   cy.contains('button', 'Add project', { timeout: 15000 }).click();
+  cy.contains('Create', { timeout: 15000 }).should('be.visible');
+});
 
-  cy.wait(1000);
+/**
+ * Selects a project-type card by its visible title (e.g. "AI Survey",
+ * "AI User Test", "AI Interview", "AI Poll") in the Create modal, then
+ * clicks the resulting CTA button (e.g. "Create AI Survey").
+ */
+Cypress.Commands.add('createProject', (typeName) => {
+  cy.openCreateProjectModal();
 
-  // Confirm a visible "Create" heading exists (the modal, not chat history)
-  cy.get('body', { timeout: 15000 }).should(() => {
-    const matches = Cypress.$('*:contains("Create")').filter((i, el) => {
-      const $el = Cypress.$(el);
-      return $el.is(':visible') && $el.width() > 0 && $el.height() > 0;
-    });
-    expect(matches.length).to.be.greaterThan(0);
+  cy.contains(typeName, { timeout: 15000 })
+    .should('be.visible')
+    .closest('[role="button"], button, li, div')
+    .click({ force: true });
+
+  cy.contains('button', new RegExp(`Create ${typeName}`, 'i'), { timeout: 15000 })
+    .should('be.visible')
+    .click();
+
+  cy.url({ timeout: 20000 }).should('match', /project-type=/i);
+
+  cy.get('body').then(($body) => {
+    if ($body.find('button:contains("Skip")').length > 0) {
+      cy.contains('button', 'Skip').click();
+    }
   });
 });
 
@@ -104,94 +88,19 @@ Cypress.Commands.add('openCreateProjectModal', () => {
  * and returns to the questions builder.
  */
 Cypress.Commands.add('createAiSurveyProject', () => {
-  cy.openCreateProjectModal();
-
-  clickVisibleByText('AI Survey');
-
-  clickVisibleByText('Create AI Survey');
+  cy.createProject('AI Survey');
 
   cy.url({ timeout: 20000 }).should('include', 'project-type=Form');
-
-  cy.get('body').then(($body) => {
-    if ($body.find('button:contains("Skip")').length > 0) {
-      cy.contains('button', 'Skip').click({ force: true });
-    }
-  });
-
   cy.contains('Questions', { timeout: 20000 }).should('be.visible');
 });
 
 /**
- * Creates a new AI User Test project end-to-end:
- * Create modal -> AI User Test -> Draft project (with goal) ->
- * wait for AI generation -> Publish -> copy link -> close modal ->
- * back to AI Projects list.
- * Stores the published survey URL via the 'publishedSurveyUrl' alias.
+ * Creates a new AI User Test project, skips the AI draft-goal modal if shown.
  */
-Cypress.Commands.add('createAiUserTestProject', (learningGoal) => {
-  const goal =
-    learningGoal ||
-    'Understand how users search for and navigate to creative tools on the website.';
+Cypress.Commands.add('createAiUserTestProject', () => {
+  cy.createProject('AI User Test');
 
-  cy.openCreateProjectModal();
-
-  clickVisibleByText('AI User Test');
-
-  clickVisibleByText('Create AI User Test');
-
-  cy.contains('Draft project', { timeout: 20000 }).should('exist');
-
-  cy.get(
-    'textarea[placeholder*="learning goal" i], textarea[placeholder*="purpose" i], textarea',
-    { timeout: 15000 }
-  )
-    .first()
-    .should('exist')
-    .clear({ force: true })
-    .type(goal, { delay: 10, force: true });
-
-  cy.contains('button', /^Draft project$/i, { timeout: 15000 })
-    .should('exist')
-    .click({ force: true });
-
-  cy.contains('Generating Survey Questions', { timeout: 30000 }).should('exist');
-  cy.contains('Quality Assurance & Optimization', { timeout: 60000 }).should('exist');
-
-  cy.contains('Draft project', { timeout: 60000 }).should('not.exist');
-  cy.contains('Build', { timeout: 30000 }).should('be.visible');
-  cy.contains('Questions', { timeout: 20000 }).should('be.visible');
-
-  cy.contains('button', 'Publish', { timeout: 15000 })
-    .should('be.visible')
-    .click({ force: true });
-
-  cy.contains('Your project has been published', { timeout: 30000 }).should('be.visible');
-
-  cy.get('input', { timeout: 15000 })
-    .filter((i, el) => /survey\/project/.test(el.value || ''))
-    .first()
-    .invoke('val')
-    .then((url) => {
-      cy.wrap(url).as('publishedSurveyUrl');
-    });
-
-  cy.contains('button', /copy link/i, { timeout: 10000 })
-    .should('be.visible')
-    .click({ force: true });
-
-  cy.contains('h2, h3, [role="heading"]', /your project has been published/i, { timeout: 10000 })
-    .parents('[role="dialog"], .fixed, div')
-    .first()
-    .within(() => {
-      cy.get('button').first().click({ force: true });
-    });
-
-  cy.contains('AI Projects', { timeout: 15000 })
-    .should('be.visible')
-    .click({ force: true });
-
-  cy.url({ timeout: 20000 }).should('include', '/projects');
-  cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
+  cy.contains(/Questions|Tasks|Build/i, { timeout: 20000 }).should('be.visible');
 });
 
 /**

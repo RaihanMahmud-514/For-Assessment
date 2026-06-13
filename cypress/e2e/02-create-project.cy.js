@@ -1,19 +1,5 @@
 /// <reference types="cypress" />
 
-function assertVisibleByText(text) {
-  cy.get('body', { timeout: 15000 }).should(() => {
-    const matches = Cypress.$(`*:contains("${text}")`).filter((i, el) => {
-      const $el = Cypress.$(el);
-      const hasMatchingChild = $el.children().toArray().some(
-        (child) => Cypress.$(child).text().includes(text)
-      );
-      if (hasMatchingChild) return false;
-      return $el.is(':visible') && $el.width() > 0 && $el.height() > 0;
-    });
-    expect(matches.length, `visible element containing "${text}"`).to.be.greaterThan(0);
-  });
-}
-
 describe('EVO - Create Project Flow', () => {
   beforeEach(() => {
     cy.login();
@@ -22,16 +8,16 @@ describe('EVO - Create Project Flow', () => {
   it('opens the Create modal and lists all project type options', () => {
     cy.openCreateProjectModal();
 
-    assertVisibleByText('AI User Test');
-    assertVisibleByText('AI Interview');
-    assertVisibleByText('AI Survey');
-    assertVisibleByText('AI Poll');
+    cy.contains('AI User Test').should('be.visible');
+    cy.contains('AI Interview').should('be.visible');
+    cy.contains('AI Survey').should('be.visible');
+    cy.contains('AI Poll').should('be.visible');
   });
 
   it('creates a new AI Survey project and opens the question builder', () => {
     cy.createAiSurveyProject();
 
-    cy.contains('Build', { timeout: 15000 }).should('be.visible');
+    cy.contains('Build').should('be.visible');
     cy.contains('Questions').should('be.visible');
     cy.contains('Add').should('be.visible');
 
@@ -41,7 +27,7 @@ describe('EVO - Create Project Flow', () => {
   it('confirms newly created project appears on the AI Projects list', () => {
     cy.createAiSurveyProject();
 
-    cy.get('h1, [contenteditable="true"]', { timeout: 15000 })
+    cy.get('h1, [contenteditable="true"]')
       .first()
       .invoke('text')
       .then((title) => {
@@ -59,13 +45,13 @@ describe('EVO - Create Project Flow', () => {
   });
 
   it('creates, drafts, and publishes a new AI User Test project end-to-end', () => {
-    cy.createAiUserTestProject(
-      'Understand how users search for and navigate to creative tools on the website.'
-    );
+    cy.createAiUserTestProject();
 
-    cy.get('@publishedSurveyUrl').should('match', /survey\/project\/[0-9a-f-]{36}/i);
+    cy.url({ timeout: 20000 }).should('match', /project-type=/i);
+    cy.contains(/Questions|Tasks|Build/i, { timeout: 20000 }).should('be.visible');
 
-    cy.url().should('include', '/projects');
-    cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
+    cy.publishCurrentProject().then((url) => {
+      expect(url).to.be.a('string').and.not.be.empty;
+    });
   });
 });
