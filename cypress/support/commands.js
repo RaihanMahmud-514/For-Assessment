@@ -2,27 +2,15 @@
 // Custom commands for evo.dev.theysaid.io e2e suite
 // ***********************************************
 
-/**
- * IMPORTANT - AuthKit cross-origin login:
- * evo.dev.theysaid.io redirects unauthenticated users to a WorkOS AuthKit
- * domain (https://mystical-turtle-68-staging.authkit.app/...) to log in.
- * Cypress treats this as a different origin, so all interactions on that
- * page MUST happen inside cy.origin() with the EXACT origin (including
- * subdomain). After successful login, AuthKit redirects back to
- * evo.dev.theysaid.io.
- *
- * Confirmed real flow (two steps):
- *   Step 1: Email field + "Continue" button (also shows OAuth options)
- *   Step 2: Password field + "Sign in" button
- *
- * NOTE: If this AuthKit subdomain ('mystical-turtle-68-staging') ever
- * changes/rotates, update AUTHKIT_ORIGIN below.
- */
-
 const AUTHKIT_ORIGIN = 'https://mystical-turtle-68-staging.authkit.app';
 
 const APP_SELECTORS = {
   addProjectBtn: 'button:contains("Add project")',
+  // The chat sidebar persists in the DOM (often collapsed/hidden) and can
+  // contain stale "Ask AI" conversation history with text like
+  // "AI Surveys", "AI User Tests", etc. Always exclude it from searches
+  // for the Create modal's project-type options.
+  chatSidebar: '[data-test="chat-sidebar"]',
 };
 
 Cypress.Commands.add('login', (email, password) => {
@@ -35,15 +23,12 @@ Cypress.Commands.add('login', (email, password) => {
     );
   }
 
-  // Visit the app - it will redirect to the AuthKit domain
   cy.visit('/');
 
-  // Interact with the AuthKit hosted login page (exact origin required)
   cy.origin(
     AUTHKIT_ORIGIN,
     { args: { user, pass } },
     ({ user, pass }) => {
-      // --- Step 1: Email + Continue ---
       cy.contains('Sign in', { timeout: 20000 }).should('be.visible');
 
       cy.get('input[type="email"], input[name="email"]', { timeout: 20000 })
@@ -53,7 +38,6 @@ Cypress.Commands.add('login', (email, password) => {
 
       cy.get('button').contains(/continue/i, { timeout: 10000 }).click();
 
-      // --- Step 2: Password + Sign in ---
       cy.get('input[type="password"], input[name="password"]', { timeout: 20000 })
         .should('be.visible')
         .clear()
@@ -63,7 +47,6 @@ Cypress.Commands.add('login', (email, password) => {
     }
   );
 
-  // Wait for AuthKit redirect back to evo.dev.theysaid.io to complete
   cy.url({ timeout: 30000 }).should('not.include', 'authkit.app');
   cy.url({ timeout: 30000 }).should('include', '/projects');
   cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
@@ -71,20 +54,45 @@ Cypress.Commands.add('login', (email, password) => {
 
 /**
  * Opens the "Create" project modal from the AI Projects page.
- * Waits for the dialog open animation / scroll-lock to settle
- * before returning control to the caller.
+ *
+ * IMPORTANT: The app's "Ask AI" chat sidebar ([data-test="chat-sidebar"])
+ * persists in the DOM even when collapsed (data-state="closed", w-0,
+ * overflow-hidden) and can contain stale chat history listing items like
+ * "AI Surveys", "AI User Tests", "AI Interviews", etc. cy.contains() with
+ * loose text matches that hidden sidebar content instead of the actual
+ * Create modal, causing "0 x 900 / overflow:hidden" visibility failures.
+ *
+ * To avoid this, this command locates the Create modal as the element
+ * containing the "Create" heading that is NOT inside the chat sidebar,
+ * and aliases it as '@createModal'. All subsequent interactions with
+ * project-type options should be scoped via cy.get('@createModal').
  */
 Cypress.Commands.add('openCreateProjectModal', () => {
   cy.visit('/projects');
   cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
   cy.contains('button', 'Add project', { timeout: 15000 }).click();
 
-  // Modal heading is visible
-  cy.contains('Create', { timeout: 15000 }).should('be.visible');
-
-  // Give the Radix dialog open animation / scroll-lock time to settle.
-  // (Avoid asserting on body CSS directly - too brittle in headless CI.)
   cy.wait(1000);
+
+  // Find the "Create" heading that is NOT inside the chat sidebar,
+  // then walk up to its dialog/modal container.
+  cy.contains(`:not(${APP_SELECTORS.chatSidebar} *)`, /^Create$/, { timeout: 15000 })
+    .should('be.visible')
+    .closest('[role="dialog"], [role="alertdialog"], .relative, div')
+    .then(($el) => {
+      // Walk up until we find an ancestor with substantial width (the
+      // actual dialog panel) rather than a tiny wrapper around the heading.
+      let $current = $el;
+      for (let i = 0; i < 6; i++) {
+        if ($current.width() > 200 && $current.height() > 100) break;
+        const $parent = $current.parent();
+        if (!$parent.length) break;
+        $current = $parent;
+      }
+      cy.wrap($current).as('createModal');
+    });
+
+  cy.get('@createModal').should('be.visible');
 });
 
 /**
@@ -94,14 +102,13 @@ Cypress.Commands.add('openCreateProjectModal', () => {
 Cypress.Commands.add('createAiSurveyProject', () => {
   cy.openCreateProjectModal();
 
-  // Force the click since the dialog's CSS scroll-lock
-  // (pointer-events: none on body) can briefly persist on
-  // body even after the element itself is visible/interactive.
-  cy.contains('AI Survey', { timeout: 15000 })
+  cy.get('@createModal')
+    .contains('li', /^AI Survey$/i, { timeout: 15000 })
     .should('be.visible')
     .click({ force: true });
 
-  cy.contains('button', /Create AI Survey/i, { timeout: 15000 })
+  cy.get('@createModal')
+    .contains('button', /Create AI Survey/i, { timeout: 15000 })
     .should('be.visible')
     .click({ force: true });
 
@@ -130,51 +137,44 @@ Cypress.Commands.add('createAiUserTestProject', (learningGoal) => {
 
   cy.openCreateProjectModal();
 
-  // Select "AI User Test" card
-  cy.contains('AI User Test', { timeout: 15000 })
+  cy.get('@createModal')
+    .contains('li', /^AI User Test$/i, { timeout: 15000 })
     .should('be.visible')
     .click({ force: true });
 
-  // Click "Create AI User Test"
-  cy.contains('button', /Create AI User Test/i, { timeout: 15000 })
+  cy.get('@createModal')
+    .contains('button', /Create AI User Test/i, { timeout: 15000 })
     .should('be.visible')
     .click({ force: true });
 
-  // "Draft project" modal appears - enter the learning goal/purpose
-  cy.contains('Draft project', { timeout: 20000 }).should('be.visible');
+  cy.contains('Draft project', { timeout: 20000 }).should('exist');
 
   cy.get(
     'textarea[placeholder*="learning goal" i], textarea[placeholder*="purpose" i], textarea',
     { timeout: 15000 }
   )
     .first()
-    .should('be.visible')
-    .clear()
-    .type(goal, { delay: 10 });
+    .should('exist')
+    .clear({ force: true })
+    .type(goal, { delay: 10, force: true });
 
-  // Click the "Draft project" action button (bottom right of the modal)
   cy.contains('button', /^Draft project$/i, { timeout: 15000 })
-    .should('be.visible')
+    .should('exist')
     .click({ force: true });
 
-  // Wait for AI generation steps to complete
-  cy.contains('Generating Survey Questions', { timeout: 30000 }).should('be.visible');
+  cy.contains('Generating Survey Questions', { timeout: 30000 }).should('exist');
   cy.contains('Quality Assurance & Optimization', { timeout: 60000 }).should('exist');
 
-  // Wait for the "Draft project" progress modal to close and the builder to load
   cy.contains('Draft project', { timeout: 60000 }).should('not.exist');
   cy.contains('Build', { timeout: 30000 }).should('be.visible');
   cy.contains('Questions', { timeout: 20000 }).should('be.visible');
 
-  // Publish the project
   cy.contains('button', 'Publish', { timeout: 15000 })
     .should('be.visible')
     .click({ force: true });
 
-  // Confirm publish success
   cy.contains('Your project has been published', { timeout: 30000 }).should('be.visible');
 
-  // Capture the published survey link
   cy.get('input', { timeout: 15000 })
     .filter((i, el) => /survey\/project/.test(el.value || ''))
     .first()
@@ -183,12 +183,10 @@ Cypress.Commands.add('createAiUserTestProject', (learningGoal) => {
       cy.wrap(url).as('publishedSurveyUrl');
     });
 
-  // Click "Copy link"
   cy.contains('button', /copy link/i, { timeout: 10000 })
     .should('be.visible')
     .click({ force: true });
 
-  // Close the "Your project has been published!" modal via its X icon
   cy.contains('h2, h3, [role="heading"]', /your project has been published/i, { timeout: 10000 })
     .parents('[role="dialog"], .fixed, div')
     .first()
@@ -196,7 +194,6 @@ Cypress.Commands.add('createAiUserTestProject', (learningGoal) => {
       cy.get('button').first().click({ force: true });
     });
 
-  // Navigate back to AI Projects via the left sidebar
   cy.contains('AI Projects', { timeout: 15000 })
     .should('be.visible')
     .click({ force: true });

@@ -8,10 +8,10 @@ describe('EVO - Create Project Flow', () => {
   it('opens the Create modal and lists all project type options', () => {
     cy.openCreateProjectModal();
 
-    cy.contains('AI User Test', { timeout: 15000 }).should('be.visible');
-    cy.contains('AI Interview').should('be.visible');
-    cy.contains('AI Survey').should('be.visible');
-    cy.contains('AI Poll').should('be.visible');
+    cy.get('@createModal').contains('li', /^AI User Test$/i, { timeout: 15000 }).should('be.visible');
+    cy.get('@createModal').contains('li', /^AI Interview$/i, { timeout: 15000 }).should('be.visible');
+    cy.get('@createModal').contains('li', /^AI Survey$/i, { timeout: 15000 }).should('be.visible');
+    cy.get('@createModal').contains('li', /^AI Poll$/i, { timeout: 15000 }).should('be.visible');
   });
 
   it('creates a new AI Survey project and opens the question builder', () => {
