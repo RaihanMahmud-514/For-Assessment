@@ -70,13 +70,35 @@ Cypress.Commands.add('login', (email, password) => {
 });
 
 /**
- * Opens the "Create" project modal from the AI Projects page.
+ * Opens the "Create" project modal from the AI Projects page,
+ * and waits for the modal to be fully interactive (animation
+ * finished, body scroll-lock / pointer-events cleared) before
+ * returning control to the caller.
  */
 Cypress.Commands.add('openCreateProjectModal', () => {
   cy.visit('/projects');
   cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
   cy.contains('button', 'Add project', { timeout: 15000 }).click();
+
+  // Modal heading is visible
   cy.contains('Create', { timeout: 15000 }).should('be.visible');
+
+  // Wait for the dialog content container to have real dimensions
+  // (it starts as 0 x 900 while the open animation is mid-flight)
+  cy.get('.relative.flex.h-full.flex-col.overflow-hidden', { timeout: 15000 })
+    .should(($el) => {
+      expect($el.height()).to.be.greaterThan(0);
+      expect($el.width()).to.be.greaterThan(0);
+    });
+
+  // Wait for Radix's scroll-lock to release pointer-events on <body>,
+  // which is what was blocking clicks on the "AI Survey" list item
+  cy.get('body', { timeout: 15000 }).should(($body) => {
+    expect($body.css('pointer-events')).not.to.equal('none');
+  });
+
+  // Final sanity check: the list item we'll click next must be visible
+  cy.contains('AI Survey', { timeout: 15000 }).should('be.visible');
 });
 
 /**
@@ -86,7 +108,9 @@ Cypress.Commands.add('openCreateProjectModal', () => {
 Cypress.Commands.add('createAiSurveyProject', () => {
   cy.openCreateProjectModal();
 
-  cy.contains('AI Survey', { timeout: 15000 }).click();
+  cy.contains('AI Survey', { timeout: 15000 })
+    .should('be.visible')
+    .click();
 
   cy.contains('button', /Create AI Survey/i, { timeout: 15000 }).click();
 
