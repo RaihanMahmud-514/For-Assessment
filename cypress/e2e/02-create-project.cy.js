@@ -8,7 +8,14 @@ describe('EVO - Create Project Flow', () => {
   it('opens the Create modal and lists all project type options', () => {
     cy.openCreateProjectModal();
 
-    cy.contains('AI User Test').should('be.visible');
+    // Ensure the modal has fully animated in before asserting visibility
+    cy.get('[role="dialog"]', { timeout: 15000 })
+      .should('be.visible')
+      .and(($el) => {
+        expect($el.height()).to.be.greaterThan(0);
+      });
+
+    cy.contains('AI User Test', { timeout: 15000 }).should('be.visible');
     cy.contains('AI Interview').should('be.visible');
     cy.contains('AI Survey').should('be.visible');
     cy.contains('AI Poll').should('be.visible');
@@ -18,7 +25,7 @@ describe('EVO - Create Project Flow', () => {
     cy.createAiSurveyProject();
 
     // Builder loaded with default question(s)
-    cy.contains('Build').should('be.visible');
+    cy.contains('Build', { timeout: 15000 }).should('be.visible');
     cy.contains('Questions').should('be.visible');
     cy.contains('Add').should('be.visible');
 
@@ -30,7 +37,7 @@ describe('EVO - Create Project Flow', () => {
     cy.createAiSurveyProject();
 
     // Give the title an editable, unique value so we can find it later
-    cy.get('h1, [contenteditable="true"]')
+    cy.get('h1, [contenteditable="true"]', { timeout: 15000 })
       .first()
       .invoke('text')
       .then((title) => {
