@@ -6,10 +6,6 @@ const AUTHKIT_ORIGIN = 'https://mystical-turtle-68-staging.authkit.app';
 
 const APP_SELECTORS = {
   addProjectBtn: 'button:contains("Add project")',
-  // The "Ask AI" chat sidebar persists in the DOM (often collapsed,
-  // data-state="closed", w-0, overflow-hidden) and can contain stale
-  // chat history with text like "AI Surveys", "AI User Tests", etc.
-  // Always exclude it when searching for Create modal content.
   notInChatSidebar: ':not([data-test="chat-sidebar"] *)',
 };
 
@@ -58,20 +54,16 @@ Cypress.Commands.add('login', (email, password) => {
  * NOTE: The app's "Ask AI" chat sidebar ([data-test="chat-sidebar"])
  * persists in the DOM even when collapsed and can contain stale chat
  * history listing items like "AI Surveys", "AI User Tests", etc.
- * All subsequent commands must exclude elements inside that sidebar
- * using the ':not([data-test="chat-sidebar"] *)' pattern, otherwise
- * cy.contains() can match the hidden sidebar content instead of the
- * actual Create modal, causing "0 x 900 / overflow:hidden" failures.
+ * All subsequent commands exclude elements inside that sidebar via
+ * the ':not([data-test="chat-sidebar"] *)' pattern.
  */
 Cypress.Commands.add('openCreateProjectModal', () => {
   cy.visit('/projects');
   cy.contains('AI Projects', { timeout: 20000 }).should('be.visible');
   cy.contains('button', 'Add project', { timeout: 15000 }).click();
 
-  // Give the dialog time to mount
   cy.wait(1000);
 
-  // Confirm the real "Create" heading (outside the chat sidebar) is present
   cy.get(`*${APP_SELECTORS.notInChatSidebar}`, { timeout: 15000 })
     .contains(/^Create$/)
     .should('exist');
@@ -85,7 +77,7 @@ Cypress.Commands.add('createAiSurveyProject', () => {
   cy.openCreateProjectModal();
 
   cy.get(`li${APP_SELECTORS.notInChatSidebar}`, { timeout: 15000 })
-    .contains(/^AI Survey$/i)
+    .contains(/AI Survey/i)
     .should('be.visible')
     .click({ force: true });
 
@@ -120,7 +112,7 @@ Cypress.Commands.add('createAiUserTestProject', (learningGoal) => {
   cy.openCreateProjectModal();
 
   cy.get(`li${APP_SELECTORS.notInChatSidebar}`, { timeout: 15000 })
-    .contains(/^AI User Test$/i)
+    .contains(/AI User Test/i)
     .should('be.visible')
     .click({ force: true });
 

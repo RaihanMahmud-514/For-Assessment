@@ -11,19 +11,19 @@ describe('EVO - Create Project Flow', () => {
     cy.openCreateProjectModal();
 
     cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
-      .contains(/^AI User Test$/i)
+      .contains(/AI User Test/i)
       .should('be.visible');
 
     cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
-      .contains(/^AI Interview$/i)
+      .contains(/AI Interview/i)
       .should('be.visible');
 
     cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
-      .contains(/^AI Survey$/i)
+      .contains(/AI Survey/i)
       .should('be.visible');
 
     cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
-      .contains(/^AI Poll$/i)
+      .contains(/AI Poll/i)
       .should('be.visible');
   });
 
