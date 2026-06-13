@@ -1,5 +1,7 @@
 /// <reference types="cypress" />
 
+const NOT_IN_CHAT_SIDEBAR = ':not([data-test="chat-sidebar"] *)';
+
 describe('EVO - Create Project Flow', () => {
   beforeEach(() => {
     cy.login();
@@ -8,10 +10,21 @@ describe('EVO - Create Project Flow', () => {
   it('opens the Create modal and lists all project type options', () => {
     cy.openCreateProjectModal();
 
-    cy.get('@createModal').contains('li', /^AI User Test$/i, { timeout: 15000 }).should('be.visible');
-    cy.get('@createModal').contains('li', /^AI Interview$/i, { timeout: 15000 }).should('be.visible');
-    cy.get('@createModal').contains('li', /^AI Survey$/i, { timeout: 15000 }).should('be.visible');
-    cy.get('@createModal').contains('li', /^AI Poll$/i, { timeout: 15000 }).should('be.visible');
+    cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
+      .contains(/^AI User Test$/i)
+      .should('be.visible');
+
+    cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
+      .contains(/^AI Interview$/i)
+      .should('be.visible');
+
+    cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
+      .contains(/^AI Survey$/i)
+      .should('be.visible');
+
+    cy.get(`li${NOT_IN_CHAT_SIDEBAR}`, { timeout: 15000 })
+      .contains(/^AI Poll$/i)
+      .should('be.visible');
   });
 
   it('creates a new AI Survey project and opens the question builder', () => {
