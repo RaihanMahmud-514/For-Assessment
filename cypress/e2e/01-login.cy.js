@@ -15,41 +15,23 @@ describe('EVO - Login Flow', () => {
     cy.visit('/');
 
     cy.origin(AUTHKIT_ORIGIN, () => {
-      // --- Email step ---
+      cy.contains('Sign in', { timeout: 20000 }).should('be.visible');
+
       cy.get('input[type="email"], input[name="email"]', { timeout: 20000 })
         .should('be.visible')
+        .clear()
         .type('invalid-user@example.com');
 
-      cy.contains('button', /continue|next|sign in|log in/i, { timeout: 10000 }).click();
+      cy.get('input[type="password"], input[name="password"]', { timeout: 20000 })
+        .should('be.visible')
+        .clear()
+        .type('WrongPassword123!');
 
-      // After submitting the email, AuthKit may either:
-      //  (a) show an error immediately (unknown account), or
-      //  (b) proceed to a password field.
-      cy.get('body', { timeout: 20000 }).then(($body) => {
-        const hasError = /invalid|incorrect|not found|no account|error|doesn't exist|does not exist/i.test(
-          $body.text()
-        );
-        const hasPasswordField =
-          $body.find('input[type="password"], input[name="password"]').length > 0;
+      cy.get('button[type="submit"]').contains(/sign in/i).click();
 
-        if (hasPasswordField) {
-          cy.get('input[type="password"], input[name="password"]', { timeout: 20000 })
-            .should('be.visible')
-            .type('WrongPassword123!');
+      cy.contains(/invalid email or password/i, { timeout: 20000 }).should('be.visible');
 
-          cy.contains('button', /sign in|log in|continue/i).click();
-
-          cy.contains(/invalid|incorrect|error|wrong/i, { timeout: 15000 }).should('be.visible');
-        } else if (hasError) {
-          cy.contains(/invalid|incorrect|not found|no account|error|doesn't exist|does not exist/i, {
-            timeout: 15000
-          }).should('be.visible');
-        } else {
-          throw new Error(
-            'After submitting an invalid email, neither a password field nor an error message appeared.'
-          );
-        }
-      });
+      cy.url().should('include', 'mystical-turtle-68-staging.authkit.app');
     });
   });
 });
