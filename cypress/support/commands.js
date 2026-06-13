@@ -59,7 +59,7 @@ Cypress.Commands.add('login', (email, password) => {
         .clear()
         .type(pass, { delay: 20 });
 
-      cy.contains(/^sign in$/i, { timeout: 10000 }).click();
+      cy.contains(/sign in/i, { timeout: 10000 }).click();
     }
   );
 
