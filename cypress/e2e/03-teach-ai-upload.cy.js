@@ -18,7 +18,6 @@ describe('EVO - Teach AI Document Upload Flow', () => {
   it('uploads a document and confirms it is added to data sources', () => {
     cy.uploadTeachAiDocument('dummy_txt_file.txt');
 
-    // Document summary section should reflect the new file
     cy.contains('Document summary', { timeout: 30000 }).should('be.visible');
     cy.contains('dummy_txt_file.txt', { timeout: 30000 }).should('be.visible');
   });
